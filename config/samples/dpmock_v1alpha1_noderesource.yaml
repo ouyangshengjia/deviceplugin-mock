@@ -1,0 +1,9 @@
+apiVersion: dpmock.volcano.sh/v1alpha1
+kind: NodeResource
+metadata:
+  labels:
+    app.kubernetes.io/name: volcano-deviceplugin-mock
+    app.kubernetes.io/managed-by: kustomize
+  name: noderesource-sample
+spec:
+  # TODO(user): Add fields here
