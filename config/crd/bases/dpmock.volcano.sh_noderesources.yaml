@@ -11,6 +11,8 @@ spec:
     kind: NodeResource
     listKind: NodeResourceList
     plural: noderesources
+    shortNames:
+    - nr
     singular: noderesource
   scope: Cluster
   versions:
@@ -39,83 +41,70 @@ spec:
           spec:
             description: spec defines the desired state of NodeResource
             properties:
-              foo:
-                description: foo is an example field of NodeResource. Edit noderesource_types.go
-                  to remove/update
+              defaultCapacity:
+                anyOf:
+                - type: integer
+                - type: string
+                description: DefaultCapacity defines the default capacity of the resource.
+                pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                x-kubernetes-int-or-string: true
+              defaultNodePatchTemplate:
+                description: DefaultNodePatchTemplate defines a default node patch
+                  body based on Go Template rendering.
+                type: string
+              defaultNodeUndoPatch:
+                description: DefaultNodeUndoPatch defines a default node patch body
+                  to be executed when the resource is removed in the node.
+                type: string
+              deviceIDGeneratePolicy:
+                description: DeviceIDGeneratePolicy describes how to generate deviceID
+                  serial.
+                properties:
+                  delimiter:
+                    description: Delimiter defines the delimiter of the ID serial.
+                    type: string
+                  ordinalStart:
+                    description: OrdinalStart defines the starting number of the ID
+                      serial.
+                    format: int32
+                    type: integer
+                  prefix:
+                    description: Prefix defines the prefix of the deviceID serial.
+                    properties:
+                      parentResourceRef:
+                        description: |-
+                          ParentResourceRef indicates that the deviceID serial is prefixed with the deviceID list of the parent resource.
+                          This field can only reference a NodeResource currently.
+                        properties:
+                          apiGroup:
+                            description: APIGroup is the group for the resource being
+                              referenced
+                            type: string
+                          kind:
+                            description: Kind is the type of resource being referenced
+                            type: string
+                          name:
+                            description: Name is the name of resource being referenced
+                            type: string
+                        required:
+                        - apiGroup
+                        - kind
+                        - name
+                        type: object
+                      static:
+                        description: Static indicates that the deviceID serial is
+                          prefixed with the static string list.
+                        items:
+                          type: string
+                        type: array
+                    type: object
+                type: object
+              resourceName:
+                description: ResourceName defines custom resource name.
                 type: string
             type: object
           status:
             description: status defines the observed state of NodeResource
-            properties:
-              conditions:
-                description: |-
-                  conditions represent the current state of the NodeResource resource.
-                  Each condition has a unique type and reflects the status of a specific aspect of the resource.
-
-                  Standard condition types include:
-                  - "Available": the resource is fully functional
-                  - "Progressing": the resource is being created or updated
-                  - "Degraded": the resource failed to reach or maintain its desired state
-
-                  The status of each condition is one of True, False, or Unknown.
-                items:
-                  description: Condition contains details for one aspect of the current
-                    state of this API Resource.
-                  properties:
-                    lastTransitionTime:
-                      description: |-
-                        lastTransitionTime is the last time the condition transitioned from one status to another.
-                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
-                      format: date-time
-                      type: string
-                    message:
-                      description: |-
-                        message is a human readable message indicating details about the transition.
-                        This may be an empty string.
-                      maxLength: 32768
-                      type: string
-                    observedGeneration:
-                      description: |-
-                        observedGeneration represents the .metadata.generation that the condition was set based upon.
-                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
-                        with respect to the current state of the instance.
-                      format: int64
-                      minimum: 0
-                      type: integer
-                    reason:
-                      description: |-
-                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
-                        Producers of specific condition types may define expected values and meanings for this field,
-                        and whether the values are considered a guaranteed API.
-                        The value should be a CamelCase string.
-                        This field may not be empty.
-                      maxLength: 1024
-                      minLength: 1
-                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
-                      type: string
-                    status:
-                      description: status of the condition, one of True, False, Unknown.
-                      enum:
-                      - "True"
-                      - "False"
-                      - Unknown
-                      type: string
-                    type:
-                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
-                      maxLength: 316
-                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
-                      type: string
-                  required:
-                  - lastTransitionTime
-                  - message
-                  - reason
-                  - status
-                  - type
-                  type: object
-                type: array
-                x-kubernetes-list-map-keys:
-                - type
-                x-kubernetes-list-type: map
             type: object
         required:
         - spec

@@ -17,50 +17,68 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
+type StaticPrefixGeneratePolicy []string
+
+// PrefixGeneratePolicy defines the policies for generating the prefix of the deviceID serial.
+// One and only one of the fields must be specified.
+type PrefixGeneratePolicy struct {
+	// Static indicates that the deviceID serial is prefixed with the static string list.
+	// +optional
+	Static StaticPrefixGeneratePolicy `json:"static,omitempty" protobuf:"bytes,1,opt,name=static"`
+
+	// ParentResourceRef indicates that the deviceID serial is prefixed with the deviceID list of the parent resource.
+	// This field can only reference a NodeResource currently.
+	// +optional
+	ParentResourceRef *ResourceReference `json:"parentResourceRef,omitempty" protobuf:"bytes,2,opt,name=parentResourceRef"`
+}
+
+type DeviceIDGeneratePolicy struct {
+	// Prefix defines the prefix of the deviceID serial.
+	// +optional
+	Prefix *PrefixGeneratePolicy `json:"prefix,omitempty" protobuf:"bytes,1,opt,name=prefix"`
+
+	// Delimiter defines the delimiter of the ID serial.
+	// +optional
+	Delimiter string `json:"delimiter,omitempty" protobuf:"bytes,2,opt,name=delimiter"`
+
+	// OrdinalStart defines the starting number of the ID serial.
+	// +optional
+	OrdinalStart int32 `json:"ordinalStart,omitempty" protobuf:"varint,3,opt,name=ordinalStart"`
+}
 
 // NodeResourceSpec defines the desired state of NodeResource
 type NodeResourceSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-	// The following markers will use OpenAPI v3 schema to validate the value
-	// More info: https://book.kubebuilder.io/reference/markers/crd-validation.html
+	// ResourceName defines custom resource name.
+	ResourceName string `json:"resourceName,omitempty" protobuf:"bytes,1,opt,name=resourceName"`
 
-	// foo is an example field of NodeResource. Edit noderesource_types.go to remove/update
+	// DeviceIDGeneratePolicy describes how to generate deviceID serial.
 	// +optional
-	Foo *string `json:"foo,omitempty"`
+	DeviceIDGeneratePolicy *DeviceIDGeneratePolicy `json:"deviceIDGeneratePolicy,omitempty" protobuf:"bytes,2,opt,name=deviceIDGeneratePolicy"`
+
+	// DefaultCapacity defines the default capacity of the resource.
+	// +optional
+	DefaultCapacity resource.Quantity `json:"defaultCapacity,omitempty" protobuf:"bytes,3,opt,name=defaultCapacity"`
+
+	// DefaultNodePatchTemplate defines a default node patch body based on Go Template rendering.
+	// +optional
+	DefaultNodePatchTemplate string `json:"defaultNodePatchTemplate,omitempty" protobuf:"bytes,4,opt,name=defaultNodePatchTemplate"`
+
+	// DefaultNodeUndoPatch defines a default node patch body to be executed when the resource is removed in the node.
+	// +optional
+	DefaultNodeUndoPatch string `json:"defaultNodeUndoPatch,omitempty" protobuf:"bytes,5,opt,name=defaultNodeUndoPatch"`
 }
 
 // NodeResourceStatus defines the observed state of NodeResource.
 type NodeResourceStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-
-	// For Kubernetes API conventions, see:
-	// https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#typical-status-properties
-
-	// conditions represent the current state of the NodeResource resource.
-	// Each condition has a unique type and reflects the status of a specific aspect of the resource.
-	//
-	// Standard condition types include:
-	// - "Available": the resource is fully functional
-	// - "Progressing": the resource is being created or updated
-	// - "Degraded": the resource failed to reach or maintain its desired state
-	//
-	// The status of each condition is one of True, False, or Unknown.
-	// +listType=map
-	// +listMapKey=type
-	// +optional
-	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:scope=Cluster
+// +kubebuilder:resource:scope=Cluster,shortName={"nr"}
 
 // NodeResource is the Schema for the noderesources API
 type NodeResource struct {

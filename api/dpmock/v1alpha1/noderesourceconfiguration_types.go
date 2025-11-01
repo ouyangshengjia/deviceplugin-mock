@@ -17,50 +17,122 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
+// ResourceInfo describes the resource information to be mocked to the selected nodes.
+// One and only one of the fields must be specified.
+type ResourceInfo struct {
+	// ResourceName indicates the name of the resource.
+	// +optional
+	ResourceName string `json:"resourceName,omitempty" protobuf:"bytes,1,opt,name=resourceName"`
+
+	// ResourceRef describes the resource information by referencing other objects.
+	// This field can only reference a NodeResource currently.
+	// +optional
+	ResourceRef *ResourceReference `json:"resourceRef,omitempty" protobuf:"bytes,2,opt,name=resourceRef"`
+}
+
+// ResourceRequirement describes the details of the resource requirement.
+type ResourceRequirement struct {
+	// ResourceInfo describes the information of the resource that is expected to be mocked.
+	ResourceInfo `json:",inline"`
+
+	// Capacity indicates the resource capacity in a node.
+	//
+	// In the case that ResourceInfo reference a ResourceReference, the default capacity can be defined by the reference.
+	// +optional
+	Capacity *resource.Quantity `json:"capacity,omitempty" protobuf:"bytes,1,opt,name=capacity"`
+
+	// NodePatchTemplate defines a node patch body based on Go Template rendering.
+	// The context of the Go Template is set to the ResourceBasicDescription corresponding to current resource in status field.
+	// For example, you can get the resolved result of the deviceID format by using ".deviceIDFormat".
+	//
+	// In the case that ResourceInfo reference a ResourceReference, the default NodePatchTemplate can be defined by the reference.
+	// +optional
+	NodePatchTemplate string `json:"nodePatchTemplate,omitempty" protobuf:"bytes,2,opt,name=nodePatchTemplate"`
+
+	// NodeUndoPatch defines a node patch body to be executed when the resource is removed in the node.
+	//
+	// In the case that ResourceInfo reference a ResourceReference, the default NodeUndoPatch can be defined by the reference.
+	// +optional
+	NodeUndoPatch string `json:"nodeUndoPatch,omitempty" protobuf:"bytes,3,opt,name=nodeUndoPatch"`
+}
 
 // NodeResourceConfigurationSpec defines the desired state of NodeResourceConfiguration
 type NodeResourceConfigurationSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-	// The following markers will use OpenAPI v3 schema to validate the value
-	// More info: https://book.kubebuilder.io/reference/markers/crd-validation.html
-
-	// foo is an example field of NodeResourceConfiguration. Edit noderesourceconfiguration_types.go to remove/update
+	// NodeSelector selects a set of nodes by using a label selector.
+	// The resource configuration will only be applied to the nodes whose labels matches this selector.
 	// +optional
-	Foo *string `json:"foo,omitempty"`
+	NodeSelector *metav1.LabelSelector `json:"nodeSelector,omitempty" protobuf:"bytes,1,opt,name=nodeSelector"`
+
+	// Resources describe the mock requirement of custom resource.
+	Resources []ResourceRequirement `json:"resources,omitempty" protobuf:"bytes,2,rep,name=resources"`
+}
+
+// DeviceIDFormat describe the format of the deviceID serial.
+// For example, given:
+//
+// Prefix:       {"dev0": 2, "dev1": 2}
+// Delimiter:    "-"
+// OrdinalStart: 0
+//
+// Then the deviceID list should be {"dev0-0", "dev0-1", "dev1-0", "dev1-1"}
+type DeviceIDFormat struct {
+	// The map key means the prefix of the deviceID and the map value means the amount of IDs corresponding to the prefix.
+	Prefix map[string]int32 `json:"prefix,omitempty" protobuf:"bytes,1,rep,name=prefix"`
+
+	// Delimiter indicates the concatenation between prefix and ordinal in the deviceID.
+	// +optional
+	Delimiter string `json:"delimiter,omitempty" protobuf:"bytes,2,opt,name=delimiter"`
+
+	// OrdinalStart indicates the starting number of the ID serial.
+	OrdinalStart int32 `json:"ordinalStart,omitempty" protobuf:"varint,3,opt,name=ordinalStart"`
+}
+
+type ResourceBasicDescription struct {
+	// ResourceName indicates the name of the resource.
+	ResourceName string `json:"resourceName,omitempty" protobuf:"bytes,1,opt,name=resourceName"`
+
+	// Capacity indicates the capacity of the resource.
+	Capacity resource.Quantity `json:"capacity,omitempty" protobuf:"bytes,2,opt,name=capacity"`
+
+	// DeviceIDFormat represents the ultimate format for generating the deviceID serial.
+	DeviceIDFormat DeviceIDFormat `json:"deviceIDFormat,omitempty" protobuf:"bytes,3,opt,name=deviceIDFormat"`
+}
+
+type ResourceDescription struct {
+	ResourceBasicDescription `json:",inline"`
+
+	// NodePatch holds the Go Template rendering result of ResourceRequirement.NodePatchTemplate.
+	// +optional
+	NodePatch string `json:"nodePatch,omitempty" protobuf:"bytes,1,opt,name=nodePatch"`
+
+	// NodeUndoPatch holds a node patch body to be executed when the resource is removed in the node.
+	// +optional
+	NodeUndoPatch string `json:"nodeUndoPatch,omitempty" protobuf:"bytes,2,opt,name=nodeUndoPatch"`
 }
 
 // NodeResourceConfigurationStatus defines the observed state of NodeResourceConfiguration.
 type NodeResourceConfigurationStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	// ResourceDescriptions hold the ultimate resolved results of the resource descriptions that defined in NodeResourceConfigurationSpec.
+	ResourceDescriptions []ResourceDescription `json:"resourceDescriptions,omitempty" protobuf:"bytes,1,rep,name=resourceDescriptions"`
 
-	// For Kubernetes API conventions, see:
-	// https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#typical-status-properties
+	// NumberDesired indicates the number of nodes that should apply the configuration.
+	NumberDesired int32 `json:"numberDesired,omitempty" protobuf:"bytes,2,opt,name=numberDesired"`
 
-	// conditions represent the current state of the NodeResourceConfiguration resource.
-	// Each condition has a unique type and reflects the status of a specific aspect of the resource.
-	//
-	// Standard condition types include:
-	// - "Available": the resource is fully functional
-	// - "Progressing": the resource is being created or updated
-	// - "Degraded": the resource failed to reach or maintain its desired state
-	//
-	// The status of each condition is one of True, False, or Unknown.
-	// +listType=map
-	// +listMapKey=type
-	// +optional
-	Conditions []metav1.Condition `json:"conditions,omitempty"`
+	// NumberAvailable indicates the number of nodes that should apply the configuration and
+	// have one daemon pod running and available.
+	NumberAvailable int32 `json:"numberAvailable,omitempty" protobuf:"bytes,3,opt,name=numberAvailable"`
+
+	// NumberSynchronized indicates the number of nodes that has synchronized the configuration.
+	NumberSynchronized int32 `json:"numberSynchronized,omitempty" protobuf:"bytes,4,opt,name=numberSynchronized"`
 }
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:scope=Cluster
+// +kubebuilder:resource:scope=Cluster,shortName={"nrcfg"}
 
 // NodeResourceConfiguration is the Schema for the noderesourceconfigurations API
 type NodeResourceConfiguration struct {
