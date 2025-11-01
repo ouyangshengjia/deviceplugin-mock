@@ -130,6 +130,7 @@ type NodeResourceConfigurationStatus struct {
 	NumberSynchronized int32 `json:"numberSynchronized,omitempty" protobuf:"bytes,4,opt,name=numberSynchronized"`
 }
 
+// +genclient
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:scope=Cluster,shortName={"nrcfg"}

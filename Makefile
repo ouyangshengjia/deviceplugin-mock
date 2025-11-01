@@ -41,6 +41,9 @@ help: ## Display this help.
 
 ##@ Development
 
+.PHONY: generate-all
+generate-all: manifests generate client-gen fmt vet ## Run all commands that generate code.
+
 .PHONY: manifests
 manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
 	$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
@@ -48,6 +51,10 @@ manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and Cust
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
+
+.PHONY: client-gen
+client-gen: ## Generate client, lister and informer code by code-generator.
+	bash ./hack/update-codegen.sh
 
 .PHONY: fmt
 fmt: ## Run go fmt against code.
