@@ -19,6 +19,8 @@ package util
 import (
 	"strconv"
 
+	"k8s.io/apimachinery/pkg/types"
+
 	dpmockv1alpha1 "volcano.sh/deviceplugin-mock/api/dpmock/v1alpha1"
 )
 
@@ -38,4 +40,8 @@ func IsNodeResourceReference(ref *dpmockv1alpha1.ResourceReference) bool {
 		return false
 	}
 	return ref.APIGroup == dpmockv1alpha1.SchemeGroupVersion.Group && ref.Kind == "NodeResource"
+}
+
+func GetNamespacedName(namespace, name string) string {
+	return types.NamespacedName{Namespace: namespace, Name: name}.String()
 }
