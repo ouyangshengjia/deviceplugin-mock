@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/kubernetes"
+	corev1 "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 
@@ -32,7 +32,7 @@ import (
 )
 
 type Controller struct {
-	kubeClient  kubernetes.Interface
+	nodeLister  corev1.NodeLister
 	nrcfgLister dpmockv1alpha1.NodeResourceConfigurationLister
 
 	synchronized atomic.Bool
@@ -79,7 +79,7 @@ func (c *Controller) Initialize() error {
 	c.managers = make(map[string]resourceManagerWithCancel)
 
 	clientSet := framework.GetClientSet()
-	c.kubeClient = clientSet.KubeClient
+	c.nodeLister = clientSet.KubeInformerFactory.Core().V1().Nodes().Lister()
 	c.nrcfgLister = clientSet.DpmockInformerFactory.Dpmock().V1alpha1().NodeResourceConfigurations().Lister()
 
 	return nil

@@ -22,10 +22,14 @@ import (
 	"path/filepath"
 	"time"
 
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/client-go/informers"
+	coreinformers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
 
 	"volcano.sh/deviceplugin-mock/client-go/clientset/versioned"
@@ -39,8 +43,6 @@ var (
 type KubeClientInitFunction func(ClientSet) error
 
 type ClientSet struct {
-	KubeletClient KubeletInterface
-
 	KubeClient          kubernetes.Interface
 	KubeInformerFactory informers.SharedInformerFactory
 
@@ -66,7 +68,22 @@ func initializeKubeClientSet(ctx context.Context, args *Args, initFuncList ...Ku
 	if err != nil {
 		return err
 	}
-	clientSet.KubeInformerFactory = informers.NewSharedInformerFactory(clientSet.KubeClient, 60*time.Second)
+	kubeInformerFactory := informers.NewSharedInformerFactory(clientSet.KubeClient, 60*time.Second)
+	kubeInformerFactory.InformerFor(&v1.Node{},
+		func(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+			tweakListOptions := func(options *metav1.ListOptions) {
+				options.FieldSelector = fields.OneTermEqualSelector(metav1.ObjectNameField, GetEnvs().NodeName).String()
+			}
+			return coreinformers.NewFilteredNodeInformer(client, resyncPeriod, cache.Indexers{}, tweakListOptions)
+		})
+	kubeInformerFactory.InformerFor(&v1.Pod{},
+		func(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+			tweakListOptions := func(options *metav1.ListOptions) {
+				options.FieldSelector = fields.OneTermEqualSelector("spec.nodeName", GetEnvs().NodeName).String()
+			}
+			return coreinformers.NewFilteredPodInformer(client, metav1.NamespaceAll, resyncPeriod, cache.Indexers{}, tweakListOptions)
+		})
+	clientSet.KubeInformerFactory = kubeInformerFactory
 
 	// init dpmock client
 	clientSet.DpmockClient, err = versioned.NewForConfig(config)
@@ -74,18 +91,6 @@ func initializeKubeClientSet(ctx context.Context, args *Args, initFuncList ...Ku
 		return err
 	}
 	clientSet.DpmockInformerFactory = externalversions.NewSharedInformerFactory(clientSet.DpmockClient, 60*time.Second)
-
-	node, err := clientSet.KubeClient.CoreV1().Nodes().Get(ctx, GetEnvs().NodeName, metav1.GetOptions{})
-	if err != nil {
-		return err
-	}
-
-	// init kubelet client
-	kubeletPort := int(node.Status.DaemonEndpoints.KubeletEndpoint.Port)
-	clientSet.KubeletClient, err = NewKubeletClientForConfig(config, GetEnvs().NodeIP, kubeletPort)
-	if err != nil {
-		return err
-	}
 
 	// invoke init functions
 	for _, f := range initFuncList {

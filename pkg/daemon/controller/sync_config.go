@@ -41,7 +41,7 @@ var nrcfgEmpty = &dpmockv1alpha1.NodeResourceConfiguration{
 }
 
 func (c *Controller) syncConfigOnce(ctx context.Context) error {
-	node, err := c.kubeClient.CoreV1().Nodes().Get(ctx, framework.GetEnvs().NodeName, metav1.GetOptions{})
+	node, err := c.nodeLister.Get(framework.GetEnvs().NodeName)
 	if err != nil {
 		return fmt.Errorf("failed to get node %s: %w", framework.GetEnvs().NodeName, err)
 	}

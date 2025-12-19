@@ -23,7 +23,6 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/cri-client/pkg/util"
@@ -31,7 +30,6 @@ import (
 	podresourcesv1 "k8s.io/kubelet/pkg/apis/podresources/v1"
 
 	"volcano.sh/deviceplugin-mock/pkg/daemon/framework"
-	dpmockutil "volcano.sh/deviceplugin-mock/pkg/util"
 )
 
 const (
@@ -39,7 +37,6 @@ const (
 	defaultPodResourcesMaxSize = 16 * 1024 * 1024
 	connectionTimeout          = 5 * time.Second
 
-	PodListKey      = "pod-monitor/pod-list"
 	PodResourcesKey = "pod-monitor/pod-resources"
 )
 
@@ -47,7 +44,6 @@ var monitor *Monitor
 
 type Monitor struct {
 	podResourceClient podresourcesv1.PodResourcesListerClient
-	kubeletClient     framework.KubeletInterface
 }
 
 type PodResource struct {
@@ -71,8 +67,6 @@ func (m *Monitor) Initialize() error {
 	}
 	m.podResourceClient = client
 
-	m.kubeletClient = framework.GetClientSet().KubeletClient
-
 	return nil
 }
 
@@ -83,23 +77,7 @@ func (m *Monitor) Run(ctx context.Context) error {
 }
 
 func (m *Monitor) updateStorage(ctx context.Context) {
-	m.fetchPods(ctx)
 	m.fetchPodResources(ctx)
-}
-
-func (m *Monitor) fetchPods(ctx context.Context) {
-	podList, err := m.kubeletClient.ListAllPods(ctx)
-	if err != nil {
-		klog.ErrorS(err, "failed to list pods")
-		return
-	}
-
-	pods := make(map[string]*v1.Pod)
-	for _, pod := range podList.Items {
-		pods[dpmockutil.GetNamespacedName(pod.Namespace, pod.Name)] = pod.DeepCopy()
-	}
-
-	framework.GetStorage().Set(PodListKey, pods)
 }
 
 func (m *Monitor) fetchPodResources(ctx context.Context) {

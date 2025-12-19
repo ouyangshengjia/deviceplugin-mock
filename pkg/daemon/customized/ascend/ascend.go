@@ -25,15 +25,16 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
+	corev1 "k8s.io/client-go/listers/core/v1"
 	"k8s.io/klog/v2"
 
 	"volcano.sh/deviceplugin-mock/pkg/daemon/framework"
 	"volcano.sh/deviceplugin-mock/pkg/daemon/podmonitor"
-	"volcano.sh/deviceplugin-mock/pkg/util"
 )
 
 type AscendService struct {
 	kubeClient       kubernetes.Interface
+	podLister        corev1.PodLister
 	podModifyMethods map[string]func(pod *v1.Pod, pr *podmonitor.PodResource) error
 }
 
@@ -53,6 +54,7 @@ func (a *AscendService) Name() string {
 
 func (a *AscendService) Initialize() error {
 	a.kubeClient = framework.GetClientSet().KubeClient
+	a.podLister = framework.GetClientSet().KubeInformerFactory.Core().V1().Pods().Lister()
 
 	return nil
 }
@@ -64,18 +66,7 @@ func (a *AscendService) Run(ctx context.Context) error {
 }
 
 func (a *AscendService) podDeviceInfoHandler(ctx context.Context) {
-	obj, ok := framework.GetStorage().Get(podmonitor.PodListKey)
-	if !ok {
-		klog.V(4).Info("pod list not found")
-		return
-	}
-	podSnapshots, ok := obj.(map[string]*v1.Pod)
-	if !ok {
-		klog.Errorf("pod list type error, got type %T", obj)
-		return
-	}
-
-	obj, ok = framework.GetStorage().Get(podmonitor.PodResourcesKey)
+	obj, ok := framework.GetStorage().Get(podmonitor.PodResourcesKey)
 	if !ok {
 		klog.V(4).Info("pod resources not found")
 		return
@@ -86,63 +77,37 @@ func (a *AscendService) podDeviceInfoHandler(ctx context.Context) {
 		return
 	}
 
-	for _, podSnapshot := range podSnapshots {
+	for _, pr := range prs {
 		select {
 		case <-ctx.Done():
 			return
 		default:
 		}
 
-		if isPodTerminated(podSnapshot) {
-			continue
-		}
-
-		podName := util.GetNamespacedName(podSnapshot.Namespace, podSnapshot.Name)
-
-		pr, exist := prs[podName]
-		if !exist {
-			klog.ErrorS(nil, "pod resource not found in storage", "podName", podName)
-			continue
-		}
-
-		// Use the pods cache obtained from kubelet to determine whether a pod update is needed, to reduce the frequency of accessing the api-server
-		podSnapshotModified := a.modifyPod(podSnapshot, pr)
-		if equality.Semantic.DeepEqual(podSnapshotModified, podSnapshot) {
-			klog.V(5).InfoS("pod does not need to be updated", "podName", podName)
-			continue
-		}
-
-		// Fetch the latest pod info from the api-server if the pod is need to be updated.
-		// The pod info obtained from kubelet will not update the ResourceVersion field, so it can not be used to do an update request.
-		pod, err := a.kubeClient.CoreV1().Pods(podSnapshot.Namespace).Get(ctx, podSnapshot.Name, metav1.GetOptions{})
+		pod, err := a.podLister.Pods(pr.Namespace).Get(pr.Name)
 		if err != nil {
-			klog.ErrorS(err, "failed to get pod from api-server", "podName", podName)
-			continue
-		}
-
-		// Exclude cases where pod have the same name but different UID, such as in pod recreation scenarios.
-		if pod.UID != podSnapshot.UID {
-			klog.Warningf("pod '%s' UID obtained from api-server(%v) and kubelet(%v) is inconsistent", pod.Name, pod.UID, podSnapshot.UID)
+			klog.ErrorS(err, "pod not found for pod resource", "pod", pr.NamespacedName)
 			continue
 		}
 
 		if isPodTerminated(pod) {
+			klog.V(4).InfoS("ignore terminated pod", "pod", klog.KObj(pod))
 			continue
 		}
 
 		podModified := a.modifyPod(pod, pr)
 		if equality.Semantic.DeepEqual(podModified, pod) {
-			klog.V(5).InfoS("pod does not need to be updated", "podName", podName)
+			klog.V(5).InfoS("pod does not need to be updated", "pod", klog.KObj(pod))
 			continue
 		}
 
 		_, err = a.kubeClient.CoreV1().Pods(podModified.Namespace).Update(ctx, podModified, metav1.UpdateOptions{})
 		if err != nil {
-			klog.ErrorS(err, "failed to update pod", "podName", podName)
+			klog.ErrorS(err, "failed to update pod", "pod", klog.KObj(podModified))
 			continue
 		}
 
-		klog.V(3).InfoS("pod updated", "podName", podName)
+		klog.V(3).InfoS("pod updated", "pod", klog.KObj(podModified))
 	}
 }
 
