@@ -18,17 +18,20 @@ package podmonitor
 
 import (
 	"context"
+	"fmt"
 	"time"
 
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/cri-client/pkg/util"
 	"k8s.io/klog/v2"
 	podresourcesv1 "k8s.io/kubelet/pkg/apis/podresources/v1"
-	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
 
 	"volcano.sh/deviceplugin-mock/pkg/daemon/framework"
-	"volcano.sh/deviceplugin-mock/pkg/util"
+	dpmockutil "volcano.sh/deviceplugin-mock/pkg/util"
 )
 
 const (
@@ -62,7 +65,7 @@ func (m *Monitor) Name() string {
 }
 
 func (m *Monitor) Initialize() error {
-	client, _, err := podresources.GetV1Client("unix://"+socketPath, connectionTimeout, defaultPodResourcesMaxSize)
+	client, _, err := getV1Client("unix://"+socketPath, connectionTimeout, defaultPodResourcesMaxSize)
 	if err != nil {
 		return err
 	}
@@ -93,7 +96,7 @@ func (m *Monitor) fetchPods(ctx context.Context) {
 
 	pods := make(map[string]*v1.Pod)
 	for _, pod := range podList.Items {
-		pods[util.GetNamespacedName(pod.Namespace, pod.Name)] = pod.DeepCopy()
+		pods[dpmockutil.GetNamespacedName(pod.Namespace, pod.Name)] = pod.DeepCopy()
 	}
 
 	framework.GetStorage().Set(PodListKey, pods)
@@ -139,4 +142,23 @@ func (m *Monitor) parseResponse(resp *podresourcesv1.ListPodResourcesResponse) m
 		podResources[podResource.NamespacedName.String()] = &podResource
 	}
 	return podResources
+}
+
+// refers to k8s.io/kubernetes/pkg/kubelet/apis/podresources/client.go
+func getV1Client(socket string, connectionTimeout time.Duration, maxMsgSize int) (podresourcesv1.PodResourcesListerClient, *grpc.ClientConn, error) {
+	addr, dialer, err := util.GetAddressAndDialer(socket)
+	if err != nil {
+		return nil, nil, err
+	}
+	ctx, cancel := context.WithTimeout(context.TODO(), connectionTimeout)
+	defer cancel()
+
+	conn, err := grpc.DialContext(ctx, addr,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithContextDialer(dialer),
+		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxMsgSize)))
+	if err != nil {
+		return nil, nil, fmt.Errorf("error dialing socket %s: %v", socket, err)
+	}
+	return podresourcesv1.NewPodResourcesListerClient(conn), conn, nil
 }
