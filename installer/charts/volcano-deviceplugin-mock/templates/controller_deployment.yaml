@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "volcano-deviceplugin-mock.controller.name" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "volcano-deviceplugin-mock.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "volcano-deviceplugin-mock.selectorLabels" . | nindent 6 }}
+      control-plane: {{ include "volcano-deviceplugin-mock.controller.name" . }}
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        {{- include "volcano-deviceplugin-mock.selectorLabels" . | nindent 8 }}
+        control-plane: {{ include "volcano-deviceplugin-mock.controller.name" . }}
+    spec:
+      serviceAccountName: {{ include "volcano-deviceplugin-mock.controller.name" . }}
+      containers:
+        - name: controller
+          image: "{{ .Values.image.registry }}/{{ .Values.image.name }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - /controller
+          args:
+            - --leader-elect
+            - --health-probe-bind-address=:8081
+            - --logtostderr=false
+            - --alsologtostderr=true
+            - --stderrthreshold=10
+            - --log_file=/var/log/volcano/{{ include "volcano-deviceplugin-mock.controller.name" . }}.log
+            - --v=3
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8081
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8081
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            {{- with .Values.controller.resources }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          volumeMounts:
+            - name: dpmock-log
+              mountPath: /var/log/volcano
+      volumes:
+        - name: dpmock-log
+          hostPath:
+            path: /var/log/volcano

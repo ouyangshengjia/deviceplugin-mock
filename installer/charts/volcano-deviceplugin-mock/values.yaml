@@ -1,0 +1,29 @@
+# Default values for volcano-deviceplugin-mock.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+image:
+  registry: "domain.local"
+  name: "volcanosh/deviceplugin-mock"
+  tag: ""
+  pullPolicy: IfNotPresent
+
+controller:
+  resources:
+    requests:
+      cpu: "0.2"
+      memory: 200Mi
+    limits:
+      cpu: "0.2"
+      memory: 200Mi
+
+daemon:
+  resources:
+    requests:
+      cpu: "0.2"
+      memory: 200Mi
+    limits:
+      cpu: "0.2"
+      memory: 200Mi
+
+customized: "daemon-ascend daemon-ascend-d910 daemon-ascend-common"

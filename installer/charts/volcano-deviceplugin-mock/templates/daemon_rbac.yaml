@@ -1,0 +1,36 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "volcano-deviceplugin-mock.daemon.name" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "volcano-deviceplugin-mock.labels" . | nindent 4 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "volcano-deviceplugin-mock.daemon.name" . }}
+  labels:
+    {{- include "volcano-deviceplugin-mock.labels" . | nindent 4 }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "volcano-deviceplugin-mock.daemon.name" . }}
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "volcano-deviceplugin-mock.daemon.name" . }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "volcano-deviceplugin-mock.daemon.name" . }}
+  labels:
+    {{- include "volcano-deviceplugin-mock.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [ "dpmock.volcano.sh" ]
+    resources: [ "noderesourceconfigurations" ]
+    verbs: [ "get", "list", "watch" ]
+  - apiGroups: [ "" ]
+    resources: [ "nodes", "pods", "nodes/status" ]
+    verbs: [ "get", "list", "watch", "update", "patch" ]

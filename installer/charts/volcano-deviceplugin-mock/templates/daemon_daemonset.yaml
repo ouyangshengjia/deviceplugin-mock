@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ include "volcano-deviceplugin-mock.daemon.name" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "volcano-deviceplugin-mock.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "volcano-deviceplugin-mock.selectorLabels" . | nindent 6 }}
+      control-plane: {{ include "volcano-deviceplugin-mock.daemon.name" . }}
+  template:
+    metadata:
+      labels:
+        {{- include "volcano-deviceplugin-mock.selectorLabels" . | nindent 8 }}
+        control-plane: {{ include "volcano-deviceplugin-mock.daemon.name" . }}
+    spec:
+      serviceAccountName: {{ include "volcano-deviceplugin-mock.daemon.name" . }}
+      containers:
+        - name: daemon
+          image: "{{ .Values.image.registry }}/{{ .Values.image.name }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - /daemon
+          args:
+            - --logtostderr=false
+            - --alsologtostderr=true
+            - --stderrthreshold=10
+            - --log_file=/var/log/volcano/{{ include "volcano-deviceplugin-mock.daemon.name" . }}.log
+            - --customized={{ .Values.customized }}
+            - --v=3
+          resources:
+            {{- with .Values.daemon.resources }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          volumeMounts:
+            - name: dpmock-log
+              mountPath: /var/log/volcano
+            - name: dpmock-sock
+              mountPath: /var/lib/kubelet/device-plugins
+            - name: pod-resources-sock
+              mountPath: /var/lib/kubelet/pod-resources
+          env:
+            - name: KUBE_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: KUBE_NODE_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+      volumes:
+        - name: dpmock-log
+          hostPath:
+            path: /var/log/volcano
+        - name: dpmock-sock
+          hostPath:
+            path: /var/lib/kubelet/device-plugins
+        - name: pod-resources-sock
+          hostPath:
+            path: /var/lib/kubelet/pod-resources
