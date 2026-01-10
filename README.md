@@ -1,121 +1,101 @@
-# volcano-deviceplugin-mock
-// TODO(user): Add simple overview of use/purpose
+# Volcano Device Plugin Mock
 
-## Description
-// TODO(user): An in-depth paragraph about your project and overview of use
+This project, `deviceplugin-mock`, is a component of the [Volcano](https://volcano.sh/) ecosystem. It is designed to mock device plugins in a Kubernetes cluster, allowing for the testing and development of schedulers and other components that rely on device resources without needing actual hardware.
+
+## Overview
+
+The project consists of two main components:
+
+- **Controller**: Manages the lifecycle and configuration of the mock devices.
+- **Daemon**: Runs on nodes and interacts with the Kubelet to register mock devices.
 
 ## Getting Started
 
 ### Prerequisites
-- go version v1.24.0+
-- docker version 17.03+.
-- kubectl version v1.11.3+.
-- Access to a Kubernetes v1.11.3+ cluster.
 
-### To Deploy on the cluster
-**Build and push your image to the location specified by `IMG`:**
+- Go 1.24.0+
+- Docker (or another container runtime)
+- Kubernetes cluster
 
-```sh
-make docker-build docker-push IMG=<some-registry>/volcano-deviceplugin-mock:tag
-```
+### Building
 
-**NOTE:** This image ought to be published in the personal registry you specified.
-And it is required to have access to pull the image from the working environment.
-Make sure you have the proper permission to the registry if the above commands don’t work.
+You can build the binaries and images using the provided `Makefile`.
 
-**Install the CRDs into the cluster:**
+#### Build Binaries
+
+To build the controller and daemon binaries locally:
 
 ```sh
-make install
+make build
 ```
 
-**Deploy the Manager to the cluster with the image specified by `IMG`:**
+The binaries will be placed in `_output/bin/`.
+
+#### Build Images
+
+To build the Docker images:
 
 ```sh
-make deploy IMG=<some-registry>/volcano-deviceplugin-mock:tag
+make images
 ```
 
-> **NOTE**: If you encounter RBAC errors, you may need to grant yourself cluster-admin
-privileges or be logged in as admin.
-
-**Create instances of your solution**
-You can apply the samples (examples) from the config/sample:
+You can customize the image registry and name using environment variables:
 
 ```sh
-kubectl apply -k config/samples/
+make images IMAGE_REGISTRY=myregistry.local IMAGE_NAME=my/mocker TAG=v1.0.0
 ```
 
->**NOTE**: Ensure that the samples has default values to test it out.
+### Deployment
 
-### To Uninstall
-**Delete the instances (CRs) from the cluster:**
+#### Using Helm
 
-```sh
-kubectl delete -k config/samples/
-```
+A Helm chart is provided in `installer/charts/volcano-deviceplugin-mock`.
 
-**Delete the APIs(CRDs) from the cluster:**
+1. **Package the Helm chart:**
 
-```sh
-make uninstall
-```
+    ```sh
+    make helm-package
+    ```
 
-**UnDeploy the controller from the cluster:**
+    The chart will be saved to `_output/charts`.
 
-```sh
-make undeploy
-```
+2. **Install the chart:**
 
-## Project Distribution
+    ```sh
+    helm install deviceplugin-mock ./installer/charts/volcano-deviceplugin-mock -n volcano-system --create-namespace
+    ```
 
-Following the options to release and provide this solution to the users.
+#### Manual Deployment
 
-### By providing a bundle with all YAML files
+The `Makefile` also provides targets for managing manifests:
 
-1. Build the installer for the image built and published in the registry:
+- **Generate Manifests:**
+  
+  ```sh
+  make manifests
+  ```
 
-```sh
-make build-installer IMG=<some-registry>/volcano-deviceplugin-mock:tag
-```
+- **Generate Helm Template:**
 
-**NOTE:** The makefile target mentioned above generates an 'install.yaml'
-file in the dist directory. This file contains all the resources built
-with Kustomize, which are necessary to install this project without its
-dependencies.
+  ```sh
+  make helm-template
+  ```
+  This will output the rendered manifests to `_output/manifest`.
 
-2. Using the installer
+## Development
 
-Users can just run 'kubectl apply -f <URL for YAML BUNDLE>' to install
-the project, i.e.:
+- **Run linting and checks:**
 
-```sh
-kubectl apply -f https://raw.githubusercontent.com/<org>/volcano-deviceplugin-mock/<tag or branch>/dist/install.yaml
-```
+  ```sh
+  make vet
+  make fmt
+  ```
 
-### By providing a Helm Chart
+- **Generate code (DeepCopy, Client, etc.):**
 
-1. Build the chart using the optional helm plugin
-
-```sh
-kubebuilder edit --plugins=helm/v1-alpha
-```
-
-2. See that a chart was generated under 'dist/chart', and users
-can obtain this solution from there.
-
-**NOTE:** If you change the project, you need to update the Helm Chart
-using the same command above to sync the latest changes. Furthermore,
-if you create webhooks, you need to use the above command with
-the '--force' flag and manually ensure that any custom configuration
-previously added to 'dist/chart/values.yaml' or 'dist/chart/manager/manager.yaml'
-is manually re-applied afterwards.
-
-## Contributing
-// TODO(user): Add detailed information on how you would like others to contribute to this project
-
-**NOTE:** Run `make help` for more information on all potential `make` targets
-
-More information can be found via the [Kubebuilder Documentation](https://book.kubebuilder.io/introduction.html)
+  ```sh
+  make generate-all
+  ```
 
 ## License
 
@@ -132,4 +112,3 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
-
